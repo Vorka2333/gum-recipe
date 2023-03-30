@@ -1,0 +1,125 @@
+$engine: 3
+name: GumFramework
+version: 1.0.1
+author: Gum
+description: A new complete and fresh framework for RedM, enjoy now and join us in this new adventure
+
+
+
+tasks:
+  # Download default CFX resources
+  - action: download_github
+    src: https://github.com/citizenfx/cfx-server-data
+    ref: master
+    subpath: resources
+    dest: ./resources/[cfx-default]
+  
+  # Basic & SQL
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_recipe
+    ref: main
+    dest: ./tmp/gum_framework
+
+
+  - action: move_path
+    src: ./tmp/gum_framework/server.cfg
+    dest: ./server.cfg
+
+  - action: connect_database
+  - action: query_database
+    file: ./tmp/gum_framework/GumFramework.sql
+
+# Framework
+
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_core
+    ref: main
+    dest: ./resources/[gum_framework]/
+
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_inventory
+    ref: main
+    dest: ./resources/[gum_framework]/
+
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_weapons
+    ref: main
+    dest: ./resources/[gum_framework]/
+
+  - action: download_github
+    src: https://github.com/Gum-Core/spawnmanager
+    ref: main
+    dest: ./resources/[gum_framework]/
+  
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_status2
+    ref: main
+    dest: ./resources/[gum_framework]/
+
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_notify
+    ref: main
+    dest: ./resources/[gum_framework]/
+  
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_metabolism
+    ref: main
+    dest: ./resources/[gum_framework]/
+
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_clothingstore
+    ref: main
+    dest: ./resources/[gum_framework]/
+  
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_barberstore
+    ref: main
+    dest: ./resources/[gum_framework]/
+
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_bank_new
+    ref: main
+    dest: ./resources/[gum_framework]/
+  
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_adminmenu_nui
+    ref: main
+    dest: ./resources/[gum_framework]/
+
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_adminmenu
+    ref: main
+    dest: ./resources/[gum_framework]/
+  
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_menu
+    ref: main
+    dest: ./resources/[gum_framework]/
+
+  - action: download_github
+    src: https://github.com/Gum-Core/uiprompt
+    ref: main
+    dest: ./resources/[gum_framework]/
+
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_character
+    ref: main
+    dest: ./resources/[gum_framework]/
+
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_inputs
+    ref: main
+    dest: ./resources/[gum_framework]/
+
+  - action: download_github
+    src: https://github.com/Gum-Core/gum_creator
+    ref: main
+    dest: ./resources/[gum_framework]/
+
+  - action: download_github
+    src: https://github.com/Gum-Core/ghmattimysql
+    ref: main
+    dest: ./resources/[gum_framework]/
+
+  - action: remove_path
+    path: ./resources/[cfx-default]/[managers]/spawnmanager
