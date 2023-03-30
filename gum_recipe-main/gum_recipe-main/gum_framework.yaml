@@ -123,4 +123,4 @@ tasks:
     dest: ./resources/[gum_framework]/
 
   - action: remove_path
-    path: ./resources/[cfx-default]/[managers]/spawnmanager
+    path: ./resources/[managers]/spawnmanager
