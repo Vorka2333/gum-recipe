@@ -1,4 +1,5 @@
 $engine: 3
+$onesync: on
 name: GumFramework
 version: 1.0.1
 author: Gum
@@ -12,7 +13,7 @@ tasks:
     src: https://github.com/citizenfx/cfx-server-data
     ref: master
     subpath: resources
-    dest: ./resources/[cfx-default]
+    dest: ./resources
   
   # Basic & SQL
   - action: download_github
