@@ -1,7 +1,8 @@
 MedInteractions = {
     currentTable = nil,
     surgeryOpen = false,
-    patientTarget = nil
+    patientTarget = nil,
+    isLayingOnTable = false
 }
 
 local function nearestTable()
@@ -36,16 +37,30 @@ local function nearestPlayer(maxDistance)
     return nearest, nearestDist
 end
 
+local function drawPrompt(text)
+    SetTextScale(0.35, 0.35)
+    SetTextFontForCurrentCommand(1)
+    SetTextCentre(true)
+    DisplayText(CreateVarString(10, 'LITERAL_STRING', text), 0.5, 0.86)
+end
+
+local function setLayState(enabled, tableDef)
+    MedInteractions.isLayingOnTable = enabled
+    TriggerServerEvent('med:server:setOnTable', enabled, tableDef and tableDef.id or nil)
+    TriggerEvent('med:client:forceLayOnTable', tableDef, enabled)
+end
+
 CreateThread(function()
     while true do
-        Wait(500)
+        Wait(400)
         local tbl = nearestTable()
-        if tbl and not MedInteractions.currentTable then
-            MedInteractions.currentTable = tbl.id
-            TriggerServerEvent('med:server:setOnTable', true)
-        elseif not tbl and MedInteractions.currentTable then
+        if tbl then
+            MedInteractions.currentTable = tbl
+        else
+            if MedInteractions.isLayingOnTable then
+                setLayState(false)
+            end
             MedInteractions.currentTable = nil
-            TriggerServerEvent('med:server:setOnTable', false)
         end
     end
 end)
@@ -54,18 +69,36 @@ CreateThread(function()
     while true do
         Wait(0)
         if MedInteractions.surgeryOpen then goto continue end
-        if MedInteractions.currentTable then
+
+        local tableDef = MedInteractions.currentTable
+        if tableDef then
+            if Config.PatientTable.AllowPatientSelfLay then
+                if MedInteractions.isLayingOnTable then
+                    drawPrompt('[E] Se relever de la table')
+                    if IsControlJustPressed(0, Config.PatientTable.PromptKeyLay) then
+                        setLayState(false, tableDef)
+                    end
+                else
+                    drawPrompt('[E] Se coucher sur la table')
+                    if IsControlJustPressed(0, Config.PatientTable.PromptKeyLay) then
+                        setLayState(true, tableDef)
+                    end
+                end
+            end
+
             local target = nearestPlayer(2.8)
             if target then
-                SetTextScale(0.35, 0.35)
-                SetTextFontForCurrentCommand(1)
-                SetTextCentre(true)
-                DisplayText(CreateVarString(10, 'LITERAL_STRING', '[G] Lancer chirurgie'), 0.5, 0.86)
-                if IsControlJustPressed(0, 0x760A9C6F) then -- G
+                drawPrompt('[G] Lancer chirurgie  [H] Placer patient')
+                if IsControlJustPressed(0, Config.PatientTable.PromptKeyStartSurgery) then
                     TriggerServerEvent('med:server:requestStartSurgery', target)
+                end
+
+                if Config.PatientTable.AllowDoctorPlace and IsControlJustPressed(0, Config.PatientTable.PromptKeyPlacePatient) then
+                    TriggerServerEvent('med:server:placePatientOnTable', target, tableDef.id)
                 end
             end
         end
+
         ::continue::
     end
 end)

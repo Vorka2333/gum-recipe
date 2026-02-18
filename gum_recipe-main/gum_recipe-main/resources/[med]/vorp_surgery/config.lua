@@ -19,7 +19,7 @@ Config.Surgery = {
     AllowedDistance = 3.0,
     CancelOpenWoundBleed = 15,
     CancelInfectionRisk = 10,
-    RequiredActions = { 'select_zone', 'incision', 'retractors', 'suture' }
+    RequiredActions = { 'select_zone', 'incision', 'retractors', 'sutures' }
 }
 
 Config.Injury = {
@@ -32,6 +32,17 @@ Config.Injury = {
     OpenBleedTick = 4,
     SprintAggravationTick = 5,
     ShockFromBleedThreshold = 60
+}
+
+Config.PatientTable = {
+    AllowPatientSelfLay = true,
+    AllowDoctorPlace = true,
+    PromptKeyLay = 0xCEFD9220, -- E
+    PromptKeyStartSurgery = 0x760A9C6F, -- G
+    PromptKeyPlacePatient = 0x24978A28, -- H
+    SnapZOffset = 0.85,
+    UseScenarioWhenLaying = false,
+    LayingScenario = `WORLD_HUMAN_SLEEP_GROUND_ARM`
 }
 
 Config.Inventory = {
@@ -57,6 +68,7 @@ Config.Inventory = {
 
 Config.Effects = {
     SyncIntervalSec = 4,
+    ForceStateSyncSec = 20,
     Blur = { enabled = true, pulseMs = 1800, strength = 0.3 },
     Stamina = { drainWhileSevere = 6, severeThreshold = 55 },
     Sprint = { maxContinuousSec = 7, ragdollDurationMs = 2500 },
@@ -66,16 +78,25 @@ Config.Effects = {
 Config.Logging = {
     PrintToConsole = true,
     SaveToDb = true,
-    SaveToFile = true,
+    SaveToFile = false,
     FilePath = 'logs/med_logs.jsonl',
+    FileFlushIntervalSec = 15,
+    FileFlushBatchSize = 25,
     FlagAdminOnExploit = true
 }
 
 Config.Admin = {
-    GroupAce = 'group.admin'
+    Mode = 'both', -- 'vorp' | 'ace' | 'both'
+    GroupAce = 'group.admin',
+    AllowedVorpGroups = { 'admin', 'superadmin', 'mod' }
 }
 
 Config.NUI = {
+    Canvas = {
+        width = 620,
+        height = 520,
+        maxIdenticalActionBurst = 60
+    },
     ToolHotkeys = {
         [1] = 'scalpel',
         [2] = 'retractors',

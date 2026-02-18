@@ -9,23 +9,61 @@ RegisterNetEvent('med:client:state', function(state)
     MedEffects.state = state
 end)
 
-RegisterNetEvent('med:client:setOperationImmobilized', function(value)
+local function alignPedToTable(ped, tableDef)
+    if not tableDef then return end
+    SetEntityCoords(ped, tableDef.coords.x, tableDef.coords.y, tableDef.coords.z + Config.PatientTable.SnapZOffset, false, false, false, false)
+    SetEntityHeading(ped, tableDef.heading or GetEntityHeading(ped))
+end
+
+RegisterNetEvent('med:client:setOperationImmobilized', function(value, tableDef)
     MedEffects.immobilized = value == true
     local ped = PlayerPedId()
+    if MedEffects.immobilized then
+        alignPedToTable(ped, tableDef)
+    end
     FreezeEntityPosition(ped, MedEffects.immobilized)
     if MedEffects.immobilized then
-        TaskStartScenarioInPlace(ped, `WORLD_HUMAN_SLEEP_GROUND_ARM`, -1, true, false, false, false)
+        ClearPedTasksImmediately(ped)
+        if Config.PatientTable.UseScenarioWhenLaying then
+            TaskStartScenarioInPlace(ped, Config.PatientTable.LayingScenario, -1, true, false, false, false)
+        end
     else
         ClearPedTasksImmediately(ped)
     end
 end)
 
+RegisterNetEvent('med:client:forceLayOnTable', function(tableDef, shouldLay)
+    local ped = PlayerPedId()
+    if shouldLay then
+        alignPedToTable(ped, tableDef)
+        FreezeEntityPosition(ped, true)
+        ClearPedTasksImmediately(ped)
+        if Config.PatientTable.UseScenarioWhenLaying then
+            TaskStartScenarioInPlace(ped, Config.PatientTable.LayingScenario, -1, true, false, false, false)
+        end
+    else
+        FreezeEntityPosition(ped, false)
+        ClearPedTasksImmediately(ped)
+    end
+end)
+
+RegisterNetEvent('med:client:surgeryInterrupted', function()
+    MedEffects.immobilized = false
+    local ped = PlayerPedId()
+    FreezeEntityPosition(ped, false)
+    ClearPedTasksImmediately(ped)
+end)
+
 CreateThread(function()
+    local lastSprintState = nil
     while true do
         Wait(Config.Effects.SyncIntervalSec * 1000)
         local ped = PlayerPedId()
         local sprinting = IsPedSprinting(ped)
-        TriggerServerEvent('med:server:syncSprintState', sprinting)
+        if lastSprintState == nil or sprinting ~= lastSprintState then
+            TriggerServerEvent('med:server:syncSprintState', sprinting)
+            lastSprintState = sprinting
+        end
     end
 end)
 

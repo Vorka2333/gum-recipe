@@ -58,18 +58,21 @@ vorp_surgery/
 - `med_logs`: logs admin/anti-exploit/audit.
 
 ## Flow client/server (MVP)
-1. Le patient entre dans une zone de table fixe -> `med:server:setOnTable(true)`.
-2. Le médecin proche presse **G** -> `med:server:requestStartSurgery(patient)`.
-3. Serveur valide **distance + table + outils inventaire + état**.
-4. Client médecin ouvre la NUI fullscreen (`med:client:beginSurgery`).
-5. NUI envoie journal d'actions/timing/erreurs (`complete`).
-6. Serveur revalide:
+1. Le patient se couche volontairement sur table (touche **E**) -> `med:server:setOnTable(true, tableId)`.
+2. Le médecin proche peut placer un patient sur la table (touche **H**) -> `med:server:placePatientOnTable(patient, tableId)`.
+3. Le médecin proche presse **G** -> `med:server:requestStartSurgery(patient)`.
+4. Serveur valide **distance + table + outils inventaire + état**.
+5. Client médecin ouvre la NUI fullscreen (`med:client:beginSurgery`).
+6. NUI envoie journal d'actions/timing/erreurs (`complete`).
+7. Serveur revalide:
    - durée minimale réaliste,
    - cohérence étapes (zone/incision/retractors/sutures...),
+   - zone autorisée + coordonnées canvas valides,
+   - anti-spam d'actions identiques,
    - patient toujours valide/proche/sur table,
    - outils toujours présents.
-7. Serveur calcule **résultat médical final** et applique DB/états/effets.
-8. En incohérence: échec + `exploit_flag` + logs admin.
+8. Serveur calcule **résultat médical final** et applique DB/états/effets.
+9. En incohérence: échec + `exploit_flag` + logs admin.
 
 ## Sécurité
 - Aucun résultat médical n'est accepté côté client.
@@ -91,6 +94,8 @@ vorp_surgery/
 - Outils requis non consommés (`ConsumeItems = false`).
 - Auto-détection blessures: présente mais désactivée (`AutoDetectionEnabled = false`).
 - Logs DB + console + fichier JSONL optionnel.
+- Permissions admin: `Config.Admin.Mode` (`vorp` / `ace` / `both`) + whitelist VORP groups.
+- Réduction réseau/DB: progression serveur en timer global + throttle de sauvegarde + sync client sur changement significatif.
 
 ## Limitations MVP
 - Tables fixes uniquement.

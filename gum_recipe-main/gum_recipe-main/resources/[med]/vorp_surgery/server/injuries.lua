@@ -1,6 +1,7 @@
 MedInjuries = {
     stateByChar = {},
-    injuriesByChar = {}
+    injuriesByChar = {},
+    lastSaveByChar = {}
 }
 
 local function defaultState()
@@ -62,12 +63,21 @@ function MedInjuries.loadPlayer(charId)
     local injuries = MedDB.fetchInjuries(charId)
     MedInjuries.stateByChar[charId] = state
     MedInjuries.injuriesByChar[charId] = injuries or {}
+    MedInjuries.lastSaveByChar[charId] = GetGameTimer()
 end
 
-function MedInjuries.savePlayer(charId)
+function MedInjuries.savePlayer(charId, force)
     local state = MedInjuries.stateByChar[charId]
     if not state then return end
+
+    local now = GetGameTimer()
+    local last = MedInjuries.lastSaveByChar[charId] or 0
+    if not force and (now - last) < Config.Injury.SaveThrottleMs then
+        return
+    end
+
     MedDB.upsertPlayerState(charId, state)
+    MedInjuries.lastSaveByChar[charId] = now
 end
 
 function MedInjuries.addInjury(charId, injury, metadata)
@@ -91,7 +101,7 @@ function MedInjuries.addInjury(charId, injury, metadata)
     end
 
     MedInjuries.stateByChar[charId] = state
-    MedInjuries.savePlayer(charId)
+    MedInjuries.savePlayer(charId, true)
     return injury
 end
 
@@ -111,7 +121,9 @@ end
 
 function MedInjuries.applyProgression(charId, isSprinting)
     local state = MedInjuries.stateByChar[charId]
-    if not state then return end
+    if not state then return false end
+
+    local before = json.encode(state)
 
     if state.has_open_wound then
         state.hemorrhage = MedUtils.clamp(state.hemorrhage + Config.Injury.OpenBleedTick, 0, 100)
@@ -131,7 +143,12 @@ function MedInjuries.applyProgression(charId, isSprinting)
         state.shock = MedUtils.clamp(state.shock + 2, 0, 100)
     end
 
-    MedInjuries.savePlayer(charId)
+    local after = json.encode(state)
+    local changed = before ~= after
+    if changed then
+        MedInjuries.savePlayer(charId, false)
+    end
+    return changed
 end
 
 function MedInjuries.applySurgeryResult(charId, result)
@@ -147,5 +164,5 @@ function MedInjuries.applySurgeryResult(charId, result)
     end
 
     MedInjuries.stateByChar[charId] = state
-    MedInjuries.savePlayer(charId)
+    MedInjuries.savePlayer(charId, true)
 end

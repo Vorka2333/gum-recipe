@@ -4,7 +4,7 @@ game 'rdr3'
 name 'vorp_surgery'
 author 'gum-recipe'
 description 'Advanced trauma/surgery system for strict RP (VORP)'
-version '0.1.0-mvp'
+version '0.1.1'
 
 ui_page 'html/index.html'
 

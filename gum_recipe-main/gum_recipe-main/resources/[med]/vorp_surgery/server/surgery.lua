@@ -32,16 +32,30 @@ local function onFixedTable(coords)
     return nil
 end
 
-function MedSurgery.setPatientOnTable(source, isOn)
+function MedSurgery.getTableById(tableId)
+    for _, tbl in ipairs(Config.Tables.Fixed) do
+        if tbl.id == tableId then
+            return tbl
+        end
+    end
+    return nil
+end
+
+function MedSurgery.setPatientOnTable(source, isOn, tableId)
     local charId = MedInjuries.ensureLoadedBySource(source)
     if not charId then return end
     local coords = getPlayerCoords(source)
     if not coords then return end
 
     if isOn then
-        local tableId = onFixedTable(coords)
-        if tableId then
-            MedSurgery.patientTable[charId] = tableId
+        local resolved = tableId and MedSurgery.getTableById(tableId) or nil
+        if not resolved then
+            local computedId = onFixedTable(coords)
+            resolved = computedId and MedSurgery.getTableById(computedId) or nil
+        end
+
+        if resolved and #(coords - resolved.coords) <= resolved.radius then
+            MedSurgery.patientTable[charId] = resolved.id
         end
     else
         MedSurgery.patientTable[charId] = nil
@@ -58,31 +72,76 @@ local function hasRequiredSequence(actions)
     local hasClamped = false
     local hasDisinfected = false
     local hasForceps = false
+    local performed = {}
 
     for _, action in ipairs(actions) do
         local key = action.tool
         if key == 'select_zone' then
             selectedZone = action.zone
+            performed.select_zone = true
             reached = math.max(reached, REQUIRED_ORDER.select_zone)
         elseif key == 'incision' and reached >= REQUIRED_ORDER.select_zone then
+            performed.incision = true
             reached = math.max(reached, REQUIRED_ORDER.incision)
         elseif key == 'retractors' and reached >= REQUIRED_ORDER.incision then
+            performed.retractors = true
             reached = math.max(reached, REQUIRED_ORDER.retractors)
         elseif key == 'forceps' and reached >= REQUIRED_ORDER.retractors then
             hasForceps = true
+            performed.forceps = true
             reached = math.max(reached, REQUIRED_ORDER.forceps)
         elseif key == 'clamps' and reached >= REQUIRED_ORDER.retractors then
             hasClamped = true
+            performed.clamps = true
             reached = math.max(reached, REQUIRED_ORDER.clamps)
         elseif key == 'sutures' and reached >= REQUIRED_ORDER.retractors then
+            performed.sutures = true
             reached = math.max(reached, REQUIRED_ORDER.sutures)
         elseif key == 'antiseptic' then
             hasDisinfected = true
+            performed.antiseptic = true
             reached = math.max(reached, REQUIRED_ORDER.antiseptic)
         end
     end
 
+    if type(Config.Surgery.RequiredActions) == 'table' then
+        for _, actionName in ipairs(Config.Surgery.RequiredActions) do
+            if not performed[actionName] then
+                return false, selectedZone, hasClamped, hasDisinfected, hasForceps
+            end
+        end
+    end
+
     return reached >= REQUIRED_ORDER.sutures, selectedZone, hasClamped, hasDisinfected, hasForceps
+end
+
+local function validateActionPayload(actions)
+    local width = Config.NUI.Canvas.width
+    local height = Config.NUI.Canvas.height
+    local maxBurst = Config.NUI.Canvas.maxIdenticalActionBurst or 60
+    local bursts = {}
+
+    for _, action in ipairs(actions) do
+        local key = tostring(action.tool or '')
+        bursts[key] = (bursts[key] or 0) + 1
+        if bursts[key] > maxBurst then
+            return false, 'action_spam_detected'
+        end
+
+        if action.zone and not MedUtils.contains(Config.Injury.Zones, action.zone) then
+            return false, 'invalid_zone'
+        end
+
+        if action.x ~= nil then
+            local x = tonumber(action.x)
+            local y = tonumber(action.y)
+            if not x or not y or x < 0 or y < 0 or x > width or y > height then
+                return false, 'invalid_canvas_coords'
+            end
+        end
+    end
+
+    return true
 end
 
 function MedSurgery.validateStart(doctorSrc, patientSrc)
@@ -173,6 +232,13 @@ function MedSurgery.finalize(doctorSrc, payload)
         return false, 'action_log_invalid'
     end
 
+    local payloadValid, payloadReason = validateActionPayload(payload.actions)
+    if not payloadValid then
+        MedLogs.flagExploit(payloadReason, { op = ctx.operationId })
+        MedSurgery.active[doctorSrc] = nil
+        return false, payloadReason
+    end
+
     local startVal = MedSurgery.validateStart(doctorSrc, ctx.patientSrc)
     if not startVal.ok then
         MedLogs.flagExploit('start_conditions_no_longer_valid', { reason = startVal.reason, op = ctx.operationId })
@@ -216,7 +282,8 @@ function MedSurgery.finalize(doctorSrc, payload)
     if targetInjury then
         local newSeverity = MedUtils.clamp((targetInjury.severity or 20) - math.floor((precision * 20) - mistakes * 3), 1, 100)
         local treated = precision > 0.35 and mistakes < 9
-        local stillProjectile = targetInjury.has_projectile and not hasForceps
+        local hadProjectileInitially = targetInjury.has_projectile == true or targetInjury.has_projectile == 1
+        local stillProjectile = hadProjectileInitially and not hasForceps
         openWound = not treated
 
         MedDB.updateInjury(targetInjury.id, {
@@ -232,7 +299,7 @@ function MedSurgery.finalize(doctorSrc, payload)
         targetInjury.is_treated = treated and 1 or 0
         targetInjury.has_projectile = stillProjectile
         targetInjury.is_open_wound = openWound
-        if targetInjury.has_projectile and hasForceps then
+        if hadProjectileInitially and hasForceps then
             projectileRemovedZone = targetInjury.body_zone
         end
     else

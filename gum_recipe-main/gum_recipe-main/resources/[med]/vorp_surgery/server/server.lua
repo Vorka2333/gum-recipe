@@ -1,21 +1,51 @@
 CreateThread(function()
     MedDB.init()
-    MedLogs.write('info', 'resource_start', { resource = GetCurrentResourceName(), version = '0.1.0-mvp' })
+    MedLogs.write('info', 'resource_start', { resource = GetCurrentResourceName(), version = '0.1.1' })
 end)
 
-local function pushStateToClient(source)
+local sprintCache = {}
+local lastStatePushByChar = {}
+
+local function pushStateToClient(source, force)
     local charId = MedInjuries.ensureLoadedBySource(source)
     if not charId then return end
     local state = MedInjuries.getState(charId)
+    local encoded = json.encode(state)
+    local now = GetGameTimer()
+    local last = lastStatePushByChar[charId]
+
+    if not force and last and last.hash == encoded and (now - last.at) < (Config.Effects.ForceStateSyncSec * 1000) then
+        return
+    end
+
+    lastStatePushByChar[charId] = { hash = encoded, at = now }
     TriggerClientEvent('med:client:state', source, state)
 end
+
+CreateThread(function()
+    while true do
+        Wait((Config.Injury.ProgressionIntervalSec or 30) * 1000)
+        for _, playerId in ipairs(GetPlayers()) do
+            local src = tonumber(playerId)
+            if src then
+                local charId = MedInjuries.ensureLoadedBySource(src)
+                if charId then
+                    local changed = MedInjuries.applyProgression(charId, sprintCache[src] == true)
+                    if changed then
+                        pushStateToClient(src, false)
+                    end
+                end
+            end
+        end
+    end
+end)
 
 AddEventHandler('playerJoining', function(playerId)
     local src = tonumber(playerId)
     SetTimeout(2000, function()
         local charId = MedInjuries.ensureLoadedBySource(src)
         if charId then
-            pushStateToClient(src)
+            pushStateToClient(src, true)
         end
     end)
 end)
@@ -27,13 +57,36 @@ AddEventHandler('playerDropped', function(reason)
             MedSurgery.cancel(doctorSrc, ('disconnect:%s'):format(reason or 'unknown'))
             TriggerClientEvent('med:client:surgeryInterrupted', ctx.doctorSrc)
             TriggerClientEvent('med:client:surgeryInterrupted', ctx.patientSrc)
+            TriggerClientEvent('med:client:setOperationImmobilized', ctx.patientSrc, false)
+            MedLogs.write('warn', 'operation_interrupted_disconnect', { operationId = ctx.operationId, dropped = src })
         end
     end
+
+    sprintCache[src] = nil
 end)
 
-RegisterNetEvent('med:server:setOnTable', function(isOn)
+RegisterNetEvent('med:server:setOnTable', function(isOn, tableId)
     local src = source
-    MedSurgery.setPatientOnTable(src, isOn == true)
+    MedSurgery.setPatientOnTable(src, isOn == true, tableId)
+end)
+
+RegisterNetEvent('med:server:placePatientOnTable', function(patientSrc, tableId)
+    local src = source
+    patientSrc = tonumber(patientSrc)
+    if not patientSrc then return end
+
+    local tableDef = MedSurgery.getTableById(tableId)
+    if not tableDef then return end
+
+    local doctorPed = GetPlayerPed(src)
+    local patientPed = GetPlayerPed(patientSrc)
+    if doctorPed == 0 or patientPed == 0 then return end
+
+    if #(GetEntityCoords(doctorPed) - tableDef.coords) > (tableDef.radius + 1.0) then return end
+    if #(GetEntityCoords(patientPed) - tableDef.coords) > (tableDef.radius + 1.8) then return end
+
+    MedSurgery.setPatientOnTable(patientSrc, true, tableId)
+    TriggerClientEvent('med:client:forceLayOnTable', patientSrc, tableDef, true)
 end)
 
 RegisterNetEvent('med:server:requestStartSurgery', function(patientSrc)
@@ -51,7 +104,10 @@ RegisterNetEvent('med:server:requestStartSurgery', function(patientSrc)
     end
 
     TriggerClientEvent('med:client:beginSurgery', src, { patient = patientSrc, operationId = ctxOrReason.operationId })
-    TriggerClientEvent('med:client:setOperationImmobilized', patientSrc, true)
+    local patientChar = MedInjuries.ensureLoadedBySource(patientSrc)
+    local tableId = patientChar and MedSurgery.patientTable[patientChar] or nil
+    local tableDef = tableId and MedSurgery.getTableById(tableId) or nil
+    TriggerClientEvent('med:client:setOperationImmobilized', patientSrc, true, tableDef)
     TriggerClientEvent('med:client:surgeryStarted', src, patientSrc)
 end)
 
@@ -84,15 +140,12 @@ RegisterNetEvent('med:server:finalizeSurgery', function(payload)
     end
 
     TriggerClientEvent('med:client:surgeryResult', src, true, _L('surgery_success'))
-    pushStateToClient(ctx.patientSrc)
+    pushStateToClient(ctx.patientSrc, true)
 end)
 
 RegisterNetEvent('med:server:syncSprintState', function(isSprinting)
     local src = source
-    local charId = MedInjuries.ensureLoadedBySource(src)
-    if not charId then return end
-    MedInjuries.applyProgression(charId, isSprinting == true)
-    pushStateToClient(src)
+    sprintCache[src] = isSprinting == true
 end)
 
 exports('addInjury', function(sourceOrCharIdentifier, injury)
