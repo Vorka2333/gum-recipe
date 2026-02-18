@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VORP Surgery</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app" class="hidden">
+    <header>
+      <h1>Opération traumato-chirurgicale</h1>
+      <div id="status">Sélectionnez une zone puis suivez les étapes.</div>
+    </header>
+
+    <main>
+      <aside id="tools"></aside>
+      <section id="workspace">
+        <img id="body" src="assets/body_schema.svg" alt="Schéma médical" />
+        <div id="zones">
+          <button data-zone="head">Tête</button>
+          <button data-zone="thorax">Thorax</button>
+          <button data-zone="abdomen">Abdomen</button>
+          <button data-zone="arm_l">Bras G</button>
+          <button data-zone="arm_r">Bras D</button>
+          <button data-zone="leg_l">Jambe G</button>
+          <button data-zone="leg_r">Jambe D</button>
+        </div>
+        <canvas id="canvas" width="620" height="520"></canvas>
+      </section>
+    </main>
+
+    <footer>
+      <button id="finish">Terminer</button>
+      <button id="cancel">Annuler</button>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
